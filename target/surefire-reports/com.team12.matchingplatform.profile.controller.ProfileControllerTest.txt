@@ -1,4 +1,0 @@
--------------------------------------------------------------------------------
-Test set: com.team12.matchingplatform.profile.controller.ProfileControllerTest
--------------------------------------------------------------------------------
-Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.314 s -- in com.team12.matchingplatform.profile.controller.ProfileControllerTest
