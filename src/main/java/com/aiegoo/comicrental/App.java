@@ -80,7 +80,28 @@ public class App {
     }
 
     private void cmdComicUpdate(String idStr) throws Exception {
-        System.out.println("[comic-update] not implemented");
+        if (idStr == null) {
+            System.out.println("Usage: comic-update [id]");
+            return;
+        }
+        int id = Integer.parseInt(idStr);
+        Comic c = comicRepo.showComicDetail(id);
+        if (c == null) {
+            System.out.println("Comic not found.");
+            return;
+        }
+        Scanner scanner = new Scanner(System.in);
+        System.out.print("제목 ("+c.getTitle()+"): ");
+        String title = scanner.nextLine().trim();
+        if (!title.isEmpty()) c.setTitle(title);
+        System.out.print("권수 ("+c.getVolume()+"): ");
+        String volInput = scanner.nextLine().trim();
+        if (!volInput.isEmpty()) c.setVolume(Integer.parseInt(volInput));
+        System.out.print("작가 ("+c.getAuthor()+"): ");
+        String author = scanner.nextLine().trim();
+        if (!author.isEmpty()) c.setAuthor(author);
+        comicRepo.updateComic(c);
+        System.out.println("Comic updated.");
     }
 
     private void cmdComicDelete(String idStr) throws Exception {
@@ -107,18 +128,81 @@ public class App {
 
     private void cmdMemberList() throws Exception {
         List<Member> list = memberRepo.listMembers();
-        System.out.printf("ID | 이름 | 전화번호\n");
+        System.out.printf("ID | 이름 | 전화번호 | 가입일\n");
         for (Member m : list) {
-            System.out.printf("%d | %s | %s\n", m.getId(), m.getName(), m.getPhone());
+            System.out.printf("%d | %s | %s | %s\n", m.getId(), m.getName(), m.getPhone(),
+                    m.getRegDate() == null ? "" : m.getRegDate().toString());
         }
     }
 
     private void cmdRent(String comicIdStr, String memberIdStr) throws Exception {
-        System.out.println("[rent] not implemented");
+        if (comicIdStr == null || memberIdStr == null) {
+            System.out.println("Usage: rent [comicId] [memberId]");
+            return;
+        }
+        int comicId = Integer.parseInt(comicIdStr);
+        int memberId = Integer.parseInt(memberIdStr);
+        Comic c = comicRepo.showComicDetail(comicId);
+        if (c == null) {
+            System.out.println("Comic not found.");
+            return;
+        }
+        if (c.isRented()) {
+            System.out.println("Comic is already rented.");
+            return;
+        }
+        // perform rental in transaction
+        try (Connection conn = DBConnectionUtil.getConnection()) {
+            conn.setAutoCommit(false);
+            try {
+                Rental r = new Rental();
+                r.setComicId(comicId);
+                r.setMemberId(memberId);
+                r.setStatus("RENTED");
+                r.setRentedAt(java.time.LocalDateTime.now());
+                rentalRepo.add(r);
+                c.setRented(true);
+                comicRepo.updateComic(c);
+                conn.commit();
+                System.out.println("대여 완료: [대여id=" + r.getId() + "] 만화("+comicId+") → 회원("+memberId+")");
+            } catch (Exception ex) {
+                conn.rollback();
+                throw ex;
+            }
+        }
     }
 
     private void cmdReturn(String rentalIdStr) throws Exception {
-        System.out.println("[return] not implemented");
+        if (rentalIdStr == null) {
+            System.out.println("Usage: return [rentalId]");
+            return;
+        }
+        int rid = Integer.parseInt(rentalIdStr);
+        Rental r = rentalRepo.findById(rid);
+        if (r == null) {
+            System.out.println("Rental not found.");
+            return;
+        }
+        if ("RETURNED".equals(r.getStatus())) {
+            System.out.println("Already returned.");
+            return;
+        }
+        try (Connection conn = DBConnectionUtil.getConnection()) {
+            conn.setAutoCommit(false);
+            try {
+                r.setStatus("RETURNED");
+                r.setReturnedAt(java.time.LocalDateTime.now());
+                rentalRepo.update(r);
+                Comic c = comicRepo.showComicDetail(r.getComicId());
+                c.setRented(false);
+                comicRepo.updateComic(c);
+                conn.commit();
+                System.out.println("반납 완료: 대여id=" + rid);
+            } catch (Exception ex) {
+                conn.rollback();
+                throw ex;
+            }
+        }
     }
 
     private void cmdRentalList() throws Exception {
