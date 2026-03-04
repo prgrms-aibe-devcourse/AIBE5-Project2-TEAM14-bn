@@ -1,0 +1,35 @@
+.classpath
+.project
+.settings/
+
+# Maven/Gradle
+target/
+build/
+
+# IntelliJ
+*.iml
+.idea/
+
+# VSCode
+.vscode/
+
+# Logs
+debug.log
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Environment files
+.env
+
+# Docker
+docker-compose.override.yml
+
+# Data dumps and archives
+comic-data/
+*.zip
+
+# Generated
+*.class
