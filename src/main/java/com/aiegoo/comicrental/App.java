@@ -56,7 +56,7 @@ public class App {
             String status = c.isRented() ? "대여중" : "대여가능";
             System.out.printf("%d | %s | %d | %s | %s | %s\n",
                     c.getId(), c.getTitle(), c.getVolume(), c.getAuthor(), status,
-                    c.getRegDate());
+                    c.getRegDate() == null ? "" : c.getRegDate().toString());
         }
     }
 
