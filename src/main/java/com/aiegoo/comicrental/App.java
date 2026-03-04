@@ -7,17 +7,17 @@ public class App {
     private final MemberRepository memberRepo = new MemberRepository();
     private final RentalRepository rentalRepo = new RentalRepository();
 
-    public void handle(String line) {
+    public void handle(String line, Scanner scanner) {
         Rq rq = new Rq(line);
         String cmd = rq.getCommand();
         try {
             switch (cmd) {
-                case "comic-add" -> cmdComicAdd();
+                case "comic-add" -> cmdComicAdd(scanner);
                 case "comic-list" -> cmdComicList();
                 case "comic-detail" -> cmdComicDetail(rq.getArg(0));
                 case "comic-update" -> cmdComicUpdate(rq.getArg(0));
                 case "comic-delete" -> cmdComicDelete(rq.getArg(0));
-                case "member-add" -> cmdMemberAdd();
+                case "member-add" -> cmdMemberAdd(scanner);
                 case "member-list" -> cmdMemberList();
                 case "rent" -> cmdRent(rq.getArg(0), rq.getArg(1));
                 case "return" -> cmdReturn(rq.getArg(0));
@@ -32,9 +32,21 @@ public class App {
     }
 
     // stubs for command implementations; actual input handling will be added later (in Main)
-    private void cmdComicAdd() throws Exception {
-        // placeholder: real input solicited in Main
-        System.out.println("[comic-add] not implemented");
+    private void cmdComicAdd(Scanner scanner) throws Exception {
+        System.out.print("제목: ");
+        String title = scanner.nextLine().trim();
+        System.out.print("권수: ");
+        int volume = Integer.parseInt(scanner.nextLine().trim());
+        System.out.print("작가: ");
+        String author = scanner.nextLine().trim();
+        Comic c = new Comic();
+        c.setTitle(title);
+        c.setVolume(volume);
+        c.setAuthor(author);
+        c.setRented(false);
+        c.setRegDate(java.time.LocalDate.now());
+        comicRepo.addComic(c);
+        System.out.println("만화책이 등록되었습니다. (id=" + c.getId() + ")");
     }
 
     private void cmdComicList() throws Exception {
@@ -80,8 +92,17 @@ public class App {
         System.out.println("Comic deleted.");
     }
 
-    private void cmdMemberAdd() throws Exception {
-        System.out.println("[member-add] not implemented");
+    private void cmdMemberAdd(Scanner scanner) throws Exception {
+        System.out.print("이름: ");
+        String name = scanner.nextLine().trim();
+        System.out.print("전화번호: ");
+        String phone = scanner.nextLine().trim();
+        Member m = new Member();
+        m.setName(name);
+        m.setPhone(phone);
+        m.setRegDate(java.time.LocalDate.now());
+        memberRepo.addMember(m);
+        System.out.println("회원이 등록되었습니다. (id=" + m.getId() + ")");
     }
 
     private void cmdMemberList() throws Exception {
