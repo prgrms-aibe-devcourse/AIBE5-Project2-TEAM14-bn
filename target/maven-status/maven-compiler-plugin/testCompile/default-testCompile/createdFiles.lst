@@ -1,0 +1,7 @@
+com/team12/matchingplatform/project/controller/ProjectControllerTest.class
+com/team12/matchingplatform/review/controller/ReviewControllerTest.class
+com/team12/matchingplatform/project/service/ProjectServiceTest.class
+com/team12/matchingplatform/match/controller/MatchControllerTest.class
+com/team12/matchingplatform/auth/controller/AuthControllerTest.class
+com/team12/matchingplatform/profile/controller/ProfileControllerTest.class
+com/team12/matchingplatform/auth/service/AuthServiceTest.class
