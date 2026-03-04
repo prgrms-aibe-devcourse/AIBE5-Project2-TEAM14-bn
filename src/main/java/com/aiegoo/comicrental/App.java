@@ -212,7 +212,7 @@ public class App {
             String returned = r.getReturnedAt() == null ? "-" : r.getReturnedAt().toLocalDate().toString();
             System.out.printf("%d | %d | %d | %s | %s\n",
                     r.getId(), r.getComicId(), r.getMemberId(),
-                    r.getRentedAt().toLocalDate().toString(), returned);
+                    r.getRentedAt() == null ? "" : r.getRentedAt().toLocalDate().toString(), returned);
         }
     }
 }
