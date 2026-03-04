@@ -5,6 +5,8 @@ import java.util.Scanner;
 public class Main {
     public static void main(String[] args) {
         Scanner scanner = new Scanner(System.in);
+        DBConnectionUtil.registerShutdownHook();
+        App app = new App();
         System.out.println("Welcome to the Comic Book Rental System");
         String command;
         while (true) {
@@ -14,8 +16,7 @@ public class Main {
                 System.out.println("Shutting down...");
                 break;
             }
-            // TODO: dispatch commands to services
-            System.out.println("Command not implemented yet: " + command);
+            app.handle(command, scanner);
         }
         scanner.close();
     }
