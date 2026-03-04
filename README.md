@@ -232,3 +232,92 @@ src/
 - 미반납 대여만 보기 (`rental-list open`)  
 - 회원별 대여 내역 (`member-rentals [memberId]`)  
 - 연체 기능(대여일 \+ 7일) 및 연체 목록 출력
+
+---
+
+## 📋 Implementation Task Checklist
+
+### Foundation Layer (Tasks 1-5)
+
+- [ ] **Task 1**: Update domain entities to match spec
+  - Verify and update `Comic.java`, `Member.java`, `Rental.java` with all required fields
+  - Comic: `id`, `title`, `volume`, `author`, `isRented`, `regDate`
+  - Member: `id`, `name`, `phone`, `regDate`
+  - Rental: `id`, `comicId`, `memberId`, `rentedAt`, `returnedAt`, `status`
+
+- [ ] **Task 2**: Implement ComicRepository/DAO
+  - Create `ComicRepository.java` with methods: `addComic()`, `listComics()`, `showComicDetail(id)`, `updateComic(id)`, `deleteComic(id)`
+  - Use `PreparedStatement` and `try-with-resources`
+
+- [ ] **Task 3**: Implement MemberRepository/DAO
+  - Create `MemberRepository.java` with methods: `addMember()`, `listMembers()`
+  - Use `PreparedStatement` and `try-with-resources`
+
+- [ ] **Task 4**: Implement RentalRepository/DAO
+  - Create `RentalRepository.java` with methods: `rentComic(comicId, memberId)`, `returnComic(rentalId)`, `listRentals()`
+  - Include validation for rental status and transaction support
+
+- [ ] **Task 5**: Create Rq command parser utility
+  - Implement `Rq.java` to parse command-line input
+  - Extract command name and parameters (e.g., `'comic-add'`, `'rent 1 2'`)
+
+### Application Layer (Tasks 6-17)
+
+- [ ] **Task 6**: Implement App.java with command dispatch
+  - Create `App.java` to route commands: `comic-add`, `comic-list`, `comic-detail`, `comic-update`, `comic-delete`, `member-add`, `member-list`, `rent`, `return`, `rental-list`, `exit`
+
+- [ ] **Task 7**: Implement comic-add command
+  - Get title, volume, author from user input
+  - Call repository to insert into database
+  - Display success message with generated ID
+
+- [ ] **Task 8**: Implement comic-list command
+  - Display all comics in table format: 번호 | 제목 | 권수 | 작가 | 상태 | 등록일
+
+- [ ] **Task 9**: Implement comic-detail command
+  - Show detailed information for a specific comic by ID
+
+- [ ] **Task 10**: Implement comic-update command
+  - Allow updating title, volume, author for a specific comic by ID
+
+- [ ] **Task 11**: Implement comic-delete command
+  - Delete a comic by ID from database
+
+- [ ] **Task 12**: Implement member-add command
+  - Get name and phone from user
+  - Insert into database
+  - Display success with ID
+
+- [ ] **Task 13**: Implement member-list command
+  - Display all members in table format
+
+- [ ] **Task 14**: Implement rent command
+  - Process rental with validation: check if comic is already rented
+  - Create rental record, update `comic.isRented = true`
+  - Use transaction
+
+- [ ] **Task 15**: Implement return command
+  - Process return with validation: check if rental exists and not returned
+  - Update `rental.returnedAt`, update `comic.isRented = false`
+  - Use transaction
+
+- [ ] **Task 16**: Implement rental-list command
+  - Display rental history: 대여id | 만화id | 회원id | 대여일 | 반납일
+  - Show '-' for unreturned rentals
+
+- [ ] **Task 17**: Update Main.java with Scanner loop
+  - Replace stub Main with proper Scanner-based command loop
+  - Integrate `App.java`
+  - Call `DBConnectionUtil.registerShutdownHook()`
+  - Handle exit command
+
+### Testing (Tasks 18-20)
+
+- [ ] **Task 18**: Manual testing - comic operations
+  - Test `comic-add`, `comic-list`, `comic-detail`, `comic-update`, `comic-delete` against Docker MySQL
+
+- [ ] **Task 19**: Manual testing - member operations
+  - Test `member-add`, `member-list` against Docker MySQL
+
+- [ ] **Task 20**: Manual testing - rental operations
+  - Test `rent`, `return`, `rental-list` including edge cases (double-rent, invalid return) against Docker MySQL
