@@ -101,10 +101,23 @@ data in the workspace or edit `init.sql` for your own samples.
    ```
 3. Browse phpMyAdmin (`http://localhost:8080`) or Adminer (`http://localhost:8081`).
 
+If you prefer a shell inside the container you can drop into bash and invoke the
+`mysql` client directly.  A `make exec` rule has been added to the Makefile for
+this purpose:
+```sh
+# start an interactive shell in the running mysql service
+make exec   # runs "docker-compose exec mysql bash"
+
+# once inside the container, connect to the database
+mysql -uroot -p"$MYSQL_ROOT_PASSWORD" comic_rental
+
+# or simply inspect the raw dump file if needed
+ls -lh /docker-entrypoint-initdb.d
+```
 ### Example test queries
 ```sql
 SELECT * FROM comics;               -- legacy demo table
-SELECT * FROM gcd_series LIMIT 5;    -- first few rows of the imported Grand Comics Database
+SELECT * FROM gcd_series LIMIT 5;    -- first few rows of the imported Grand Comics Database (column `name` holds the title)
 SELECT * FROM members;
 SELECT * FROM rentals WHERE status='RENTED';
 SELECT * FROM rental_overview LIMIT 10; -- convenient join of rentals, members, and series
@@ -112,6 +125,24 @@ SELECT * FROM rental_overview LIMIT 10; -- convenient join of rentals, members, 
 
 The `rental_overview` view makes it easy to see which member has checked out
 which series without having to join tables manually.
+
+> **Note:** some older databases created before the view was corrected may not
+> contain `rental_overview` or may reference a non‑existent `title` column. You
+> can rebuild it with:
+> ```sql
+> DROP VIEW IF EXISTS rental_overview;
+> CREATE VIEW rental_overview AS
+> SELECT r.id AS rental_id,
+>        m.name AS member_name,
+>        g.name AS comic_title,
+>        r.rented_at,
+>        r.due_date,
+>        r.returned_at,
+>        r.status
+> FROM rentals r
+> JOIN members m ON r.member_id = m.id
+> JOIN gcd_series g ON r.comic_id = g.id;
+> ```
 
 All Docker‑related files (`docker-compose.yml`, `.env`, `Makefile`, etc.) reside in
 the repository root. See the repository root README for full details.

@@ -43,7 +43,7 @@ CREATE TABLE IF NOT EXISTS rentals (
 CREATE OR REPLACE VIEW rental_overview AS
 SELECT r.id           AS rental_id,
        m.name         AS member_name,
-       g.title        AS comic_title,
+       g.name         AS comic_title,
        r.rented_at,
        r.due_date,
        r.returned_at,
