@@ -16,4 +16,8 @@ public class MemberRepository {
     public List<Member> listMembers() throws Exception {
         return dao.listAll();
     }
+
+    public Member findByPhone(String phone) throws Exception {
+        return dao.findByPhone(phone);
+    }
 }

@@ -12,6 +12,8 @@ services:
     volumes:
       - db_data:/var/lib/mysql
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      # mount the GCD dump so it will be executed during initialization
+      - ./comic-data/2026-03-01.sql:/docker-entrypoint-initdb.d/2026-03-01.sql:ro
     command: [
       "--character-set-server=utf8mb4",
       "--collation-server=utf8mb4_unicode_ci",

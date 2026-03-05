@@ -34,6 +34,35 @@ public class ComicDAOImpl implements ComicDAO {
     @Override
     public List<Comic> listAll() throws Exception {
         String sql = "SELECT id, title, volume_count, author, is_rented FROM comics ORDER BY id";
+        return executeComicQuery(sql);
+    }
+
+    @Override
+    public List<Comic> search(String keyword) throws Exception {
+        String sql = "SELECT id, title, volume_count, author, is_rented " +
+                     "FROM comics WHERE title LIKE ? OR author LIKE ? ORDER BY id";
+        List<Comic> list = new ArrayList<>();
+        String pattern = "%" + keyword + "%";
+        try (Connection conn = DBConnectionUtil.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setString(1, pattern);
+            stmt.setString(2, pattern);
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    Comic c = new Comic();
+                    c.setId(rs.getInt("id"));
+                    c.setTitle(rs.getString("title"));
+                    c.setVolume(rs.getInt("volume_count"));
+                    c.setAuthor(rs.getString("author"));
+                    c.setRented(rs.getBoolean("is_rented"));
+                    list.add(c);
+                }
+            }
+        }
+        return list;
+    }
+
+    private List<Comic> executeComicQuery(String sql) throws Exception {
         List<Comic> list = new ArrayList<>();
         try (Connection conn = DBConnectionUtil.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql);

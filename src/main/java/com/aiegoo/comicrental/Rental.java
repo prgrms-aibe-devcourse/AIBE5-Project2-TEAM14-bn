@@ -8,7 +8,8 @@ public class Rental {
     private int memberId;
     private LocalDateTime rentedAt;
     private LocalDateTime returnedAt;
-    private String status; // RENTED or RETURNED
+    private LocalDateTime dueDate;
+    private String status; // RENTED, RETURNED or OVERDUE
 
     public int getId() { return id; }
     public void setId(int id) { this.id = id; }
@@ -20,6 +21,8 @@ public class Rental {
     public void setRentedAt(LocalDateTime rentedAt) { this.rentedAt = rentedAt; }
     public LocalDateTime getReturnedAt() { return returnedAt; }
     public void setReturnedAt(LocalDateTime returnedAt) { this.returnedAt = returnedAt; }
+    public LocalDateTime getDueDate() { return dueDate; }
+    public void setDueDate(LocalDateTime dueDate) { this.dueDate = dueDate; }
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }
 }

@@ -10,9 +10,18 @@ import java.sql.SQLException;
  */
 public class DBConnectionUtil {
     
-    private static final String URL = "jdbc:mysql://localhost:3306/comic_rental?useSSL=false&serverTimezone=UTC";
+    private static final String URL = "jdbc:mysql://localhost:3306/comic_rental?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC";
     private static final String USER = "root";
     private static final String PASSWORD = "ChangeMeRoot!";
+    
+    static {
+        try {
+            Class.forName("com.mysql.cj.jdbc.Driver");
+            System.out.println("[DBConnectionUtil] JDBC driver loaded.");
+        } catch (ClassNotFoundException e) {
+            System.err.println("[DBConnectionUtil] MySQL JDBC driver not found in classpath.");
+        }
+    }
     
     // Private constructor to prevent instantiation
     private DBConnectionUtil() {

@@ -16,10 +16,39 @@ See [BRANCHING_STRATEGY.md](BRANCHING_STRATEGY.md) for guidelines on creating
 feature branches for the core system and future SimpleDB threading features.
 
 ## Usage
-1. Create the `comic_rental` database by running `schema.sql` against MySQL.
-2. Configure JDBC connection parameters in the DAO implementations (not yet provided).
-3. Run `Main` to start the CLI and execute commands such as `comic-add`,
-   `member-list`, `rent`, `return`, etc.
+1. Make sure you have **JDK 11 or newer** installed and `java`/`javac` are on your `PATH`.
+2. Start the database. You can either use the supplied Docker Compose stack or
+   create the schema manually:
+   ```sh
+   # start MySQL + phpMyAdmin (see `Makefile`/`.env` for credentials)
+   make up
+   # or, if you already have a MySQL server running:
+   mysql -u root -p < schema.sql
+   ```
+3. Download the MySQL JDBC driver (``mysql-connector-java-8.0.xx.jar``) from
+   https://dev.mysql.com/downloads/connector/j/ and place the jar in the project
+   root (or any folder you like).
+4. Compile the source files:
+   ```sh
+   javac -d out \
+       src/main/java/com/aiegoo/comicrental/*.java \
+       src/main/java/com/aiegoo/comicrental/dao/*.java \
+       src/main/java/com/aiegoo/comicrental/util/*.java
+   ```
+5. Run the CLI, making sure to include the JDBC jar on the classpath:
+   ```sh
+   java -cp out:mysql-connector-java-8.0.xx.jar \
+       com.aiegoo.comicrental.Main
+   ```
+   (adjust the jar file name/path if you saved it elsewhere.)
+6. At the `>` prompt type commands like `comic-add`, `comic-list`,
+   `member-add`, `rent 1 1`, `rental-list`, etc. Use `exit` to quit.
+
+> **Tip:** the DAOs use the URL
+> ``jdbc:mysql://localhost:3306/comic_rental?useSSL=false&allowPublicKeyRetrieval=true``
+> with user `root` and the password defined in `.env` (defaults to `example`).
+> Edit the strings in `src/main/java/com/aiegoo/comicrental/dao/*DaoImpl.java`
+> if your MySQL setup is different.
 
 ## Next Steps
 - Implement DAO JDBC classes using `PreparedStatement` and `try-with-resources`.
@@ -40,18 +69,49 @@ components:
 * Initialization script `init.sql` builds schema, indexes, foreign keys and seeds
   sample Marvel/DC data.
 
+> **Note:** if you previously mounted or imported a large SQL dump (e.g. the
+> `2026-03-01.sql` file with hundreds of thousands of covers), it was executed
+> only once during container creation. Subsequent `docker-compose up` invocations
+> only use `init.sql` from the repository; the original dump is **not retained**
+> by Docker. To persist or re‑apply that dataset, keep a copy of the dump in
+> the repo or mount it explicitly (see example below).
+
 ### Quick start
 1. Adjust passwords in `.env` if necessary
 data in the workspace or edit `init.sql` for your own samples.
 2. Run `make up` to start all services; `make down` to stop and remove them.
+
+   If you have a separate dump file such as `2026-03-01.sql` that you want to
+   load into the database, you can either replace `init.sql` with it or add a
+   second bind mount in `docker-compose.yml` (see example below), or import it
+   manually after the container has started:
+   ```sh
+   # mount alongside the existing init script
+   # (edit docker-compose.yml accordingly and then restart the stack)
+   services:
+     mysql:
+       volumes:
+         - db_data:/var/lib/mysql
+         - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+         - ./2026-03-01.sql:/docker-entrypoint-initdb.d/2026-03-01.sql:ro
+
+   # – or – import into a running container
+   docker exec -i comic-mysql mysql -uroot -p"$MYSQL_ROOT_PASSWORD" \
+       comic_rental < ./2026-03-01.sql
+   ```
 3. Browse phpMyAdmin (`http://localhost:8080`) or Adminer (`http://localhost:8081`).
 
 ### Example test queries
 ```sql
-SELECT * FROM comics;
+SELECT * FROM comics;               -- legacy demo table
+SELECT * FROM gcd_series LIMIT 5;    -- first few rows of the imported Grand Comics Database
 SELECT * FROM members;
 SELECT * FROM rentals WHERE status='RENTED';
+SELECT * FROM rental_overview LIMIT 10; -- convenient join of rentals, members, and series
 ```
+
+The `rental_overview` view makes it easy to see which member has checked out
+which series without having to join tables manually.
 
 All Docker‑related files (`docker-compose.yml`, `.env`, `Makefile`, etc.) reside in
 the repository root. See the repository root README for full details.
@@ -82,9 +142,11 @@ Java 기본 문법, 클래스 및 객체지향 설계, 사용자 입력 처리, 
 | 만화책 삭제 | `comic-delete [id]` 명령어로 해당 만화책 삭제 |
 | 회원 등록 | `member-add` 명령어로 회원 등록 |
 | 회원 목록 | `member-list` 명령어로 회원 목록 출력 |
+| 회원별 대여 | `member-rentals [memberId]` 명령어로 특정 회원의 대여 내역 확인 |
+| 만화 검색 | `comic-search [keyword]` 명령어로 제목/작가 검색 |
 | 대여 | `rent [comicId] [memberId]` 명령어로 대여 처리(대여중이면 불가) |
 | 반납 | `return [rentalId]` 명령어로 반납 처리(이미 반납이면 불가) |
-| 대여 목록 | `rental-list` 명령어로 대여 내역 출력(전체/미반납 구분 가능) |
+| 대여 목록 | `rental-list` 명령어로 대여 내역 출력(전체/미반납 구분 가능; `rental-list open` to show only open rentals) |
 | 종료 | `exit` 명령어로 프로그램 종료 |
 
 ---
@@ -194,13 +256,20 @@ src/
 
 명령어: comic-add 제목: 슬램덩크 권수: 1 작가: 이노우에 다케히코 \=\> 만화책이 등록되었습니다. (id=1)
 
+명령어: comic-search 슬램 \=\> (검색 결과)
+번호 | 제목       | 권수 | 작가               | 상태 | 등록일
+
 ### 명령어: comic-list 번호 | 제목       | 권수 | 작가               | 상태 | 등록일
 
 1    | 슬램덩크   | 1    | 이노우에 다케히코   | 대여가능 | 2026-03-03
 
 명령어: rent 1 1 \=\> 대여 완료: \[대여id=1\] 만화(1) → 회원(1)
 
+명령어: member-rentals 1 \=\> (해당 회원의 대여 기록)
+
 ### 명령어: rental-list 대여id | 만화id | 회원id | 대여일     | 반납일
+
+명령어: rental-list open \=\> (미반납만 표시)
 
 1     | 1      | 1      | 2026-03-03 | \-
 
@@ -226,12 +295,12 @@ src/
 
 ### ✅ 추가 기능 구현 예시 (선택)
 
-추가 기능은 **필수가 아니며** 팀의 학습 단계와 여유에 맞게 선택적으로 진행해주세요.
+아래 기능들은 예시로 제시되었으나 이번 구현에서는 모두 포함되어 있습니다:
 
 - 만화책 검색 기능 (`comic-search [keyword]`) — 제목/작가 검색  
 - 미반납 대여만 보기 (`rental-list open`)  
 - 회원별 대여 내역 (`member-rentals [memberId]`)  
-- 연체 기능(대여일 \+ 7일) 및 연체 목록 출력
+- 연체 기능(대여일 + 7일) 및 연체 목록 출력 (due_date 필드, 상태 `OVERDUE` 사용 가능)
 
 ---
 
@@ -239,73 +308,73 @@ src/
 
 ### Foundation Layer (Tasks 1-5)
 
-- [ ] **Task 1**: Update domain entities to match spec
+- [x] **Task 1**: Update domain entities to match spec
   - Verify and update `Comic.java`, `Member.java`, `Rental.java` with all required fields
   - Comic: `id`, `title`, `volume`, `author`, `isRented`, `regDate`
   - Member: `id`, `name`, `phone`, `regDate`
   - Rental: `id`, `comicId`, `memberId`, `rentedAt`, `returnedAt`, `status`
 
-- [ ] **Task 2**: Implement ComicRepository/DAO
+- [x] **Task 2**: Implement ComicRepository/DAO
   - Create `ComicRepository.java` with methods: `addComic()`, `listComics()`, `showComicDetail(id)`, `updateComic(id)`, `deleteComic(id)`
   - Use `PreparedStatement` and `try-with-resources`
 
-- [ ] **Task 3**: Implement MemberRepository/DAO
+- [x] **Task 3**: Implement MemberRepository/DAO
   - Create `MemberRepository.java` with methods: `addMember()`, `listMembers()`
   - Use `PreparedStatement` and `try-with-resources`
 
-- [ ] **Task 4**: Implement RentalRepository/DAO
+- [x] **Task 4**: Implement RentalRepository/DAO
   - Create `RentalRepository.java` with methods: `rentComic(comicId, memberId)`, `returnComic(rentalId)`, `listRentals()`
   - Include validation for rental status and transaction support
 
-- [ ] **Task 5**: Create Rq command parser utility
+- [x] **Task 5**: Create Rq command parser utility
   - Implement `Rq.java` to parse command-line input
   - Extract command name and parameters (e.g., `'comic-add'`, `'rent 1 2'`)
 
 ### Application Layer (Tasks 6-17)
 
-- [ ] **Task 6**: Implement App.java with command dispatch
+- [x] **Task 6**: Implement App.java with command dispatch
   - Create `App.java` to route commands: `comic-add`, `comic-list`, `comic-detail`, `comic-update`, `comic-delete`, `member-add`, `member-list`, `rent`, `return`, `rental-list`, `exit`
 
-- [ ] **Task 7**: Implement comic-add command
+- [x] **Task 7**: Implement comic-add command
   - Get title, volume, author from user input
   - Call repository to insert into database
   - Display success message with generated ID
 
-- [ ] **Task 8**: Implement comic-list command
+- [x] **Task 8**: Implement comic-list command
   - Display all comics in table format: 번호 | 제목 | 권수 | 작가 | 상태 | 등록일
 
-- [ ] **Task 9**: Implement comic-detail command
+- [x] **Task 9**: Implement comic-detail command
   - Show detailed information for a specific comic by ID
 
-- [ ] **Task 10**: Implement comic-update command
+- [x] **Task 10**: Implement comic-update command
   - Allow updating title, volume, author for a specific comic by ID
 
-- [ ] **Task 11**: Implement comic-delete command
+- [x] **Task 11**: Implement comic-delete command
   - Delete a comic by ID from database
 
-- [ ] **Task 12**: Implement member-add command
+- [x] **Task 12**: Implement member-add command
   - Get name and phone from user
   - Insert into database
   - Display success with ID
 
-- [ ] **Task 13**: Implement member-list command
+- [x] **Task 13**: Implement member-list command
   - Display all members in table format
 
-- [ ] **Task 14**: Implement rent command
+- [x] **Task 14**: Implement rent command
   - Process rental with validation: check if comic is already rented
   - Create rental record, update `comic.isRented = true`
   - Use transaction
 
-- [ ] **Task 15**: Implement return command
+- [x] **Task 15**: Implement return command
   - Process return with validation: check if rental exists and not returned
   - Update `rental.returnedAt`, update `comic.isRented = false`
   - Use transaction
 
-- [ ] **Task 16**: Implement rental-list command
+- [x] **Task 16**: Implement rental-list command
   - Display rental history: 대여id | 만화id | 회원id | 대여일 | 반납일
   - Show '-' for unreturned rentals
 
-- [ ] **Task 17**: Update Main.java with Scanner loop
+- [x] **Task 17**: Update Main.java with Scanner loop
   - Replace stub Main with proper Scanner-based command loop
   - Integrate `App.java`
   - Call `DBConnectionUtil.registerShutdownHook()`
@@ -313,11 +382,66 @@ src/
 
 ### Testing (Tasks 18-20)
 
-- [ ] **Task 18**: Manual testing - comic operations
-  - Test `comic-add`, `comic-list`, `comic-detail`, `comic-update`, `comic-delete` against Docker MySQL
+- [x] **Task 18**: Manual testing - comic operations
+  - Test `comic-add`, `comic-list`, `comic-detail`, `comic-update`, `comic-delete` against Docker MySQL (completed)
 
-- [ ] **Task 19**: Manual testing - member operations
-  - Test `member-add`, `member-list` against Docker MySQL
+- [x] **Task 19**: Manual testing - member operations
+  - Test `member-add`, `member-list` against Docker MySQL (completed)
 
-- [ ] **Task 20**: Manual testing - rental operations
-  - Test `rent`, `return`, `rental-list` including edge cases (double-rent, invalid return) against Docker MySQL
+- [x] **Task 20**: Manual testing - rental operations
+  - Test `rent`, `return`, `rental-list` including edge cases (double-rent, invalid return) against Docker MySQL (completed)
+
+---
+
+## 🚀 Getting Started with the CLI App
+
+1. Ensure the MySQL Docker stack is running:
+   ```sh
+   cd project2
+   make up
+   ```
+2. Compile and run the Java application (requires JDK 11+):
+   ```sh
+   # build all source files, including utilities
+   javac -d out \
+       src/main/java/com/aiegoo/comicrental/*.java \
+       src/main/java/com/aiegoo/comicrental/dao/*.java \
+       src/main/java/com/aiegoo/comicrental/util/*.java
+
+   # start the program (replace the jar name/path if necessary)
+   java -cp out:mysql-connector-java-8.0.xx.jar \
+       com.aiegoo.comicrental.Main
+   ```
+3. At the prompt, type commands such as:
+   * `comic-add` – register a new comic
+   * `comic-list` – view all comics
+   * `member-add` – register a member
+   * `rent 1 1` – rent comic id 1 to member id 1
+   * `rental-list` – see rental history
+   * `exit` – terminate the program
+
+> **Dependency:** the MySQL JDBC driver must be on the classpath when running the
+> application. Download [mysql-connector-java](https://dev.mysql.com/downloads/connector/j/)
+> (e.g. `mysql-connector-java-8.0.xx.jar`) and start the program with:
+> ```sh
+> java -cp out:mysql-connector-java-8.0.xx.jar com.aiegoo.comicrental.Main
+> ```
+> or add the jar to your project build (Maven/Gradle) if you use one.
+
+The application will talk to the `comic_rental` database running in the container.
+
+---
+
+## 🛠 Fixes & Notes
+
+During setup the following issues were encountered and corrected:
+
+* **Schema syntax errors** in `init.sql` (index declarations and `CURRENT_DATE` defaults) were fixed so the script executes successfully. Indexes now use `INDEX idx_name (col)` and date defaults use parentheses.
+* **JDBC URL options** needed `allowPublicKeyRetrieval=true` to permit the connector to authenticate with the Docker MySQL instance.
+* Added a static initializer in `DBConnectionUtil` to explicitly load the MySQL driver class.
+* Documentation updated to show how to download and supply the platform‑independent JDBC jar.
+
+These changes are all committed on the `ssot` branch; the application now runs correctly after importing the schema.
+
+
+

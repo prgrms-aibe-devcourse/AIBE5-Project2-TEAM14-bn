@@ -33,3 +33,6 @@ comic-data/
 
 # Generated
 *.class
+
+# JDBC driver jars
+*.jar

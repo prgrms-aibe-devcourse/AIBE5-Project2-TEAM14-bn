@@ -21,6 +21,10 @@ public class ComicRepository {
         return dao.listAll();
     }
 
+    public List<Comic> searchComics(String keyword) throws Exception {
+        return dao.search(keyword);
+    }
+
     public Comic showComicDetail(int id) throws Exception {
         return dao.findById(id);
     }

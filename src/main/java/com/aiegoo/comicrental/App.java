@@ -1,11 +1,20 @@
 package com.aiegoo.comicrental;
 
 import java.util.List;
+import java.util.Scanner;
+import java.sql.Connection;
+import java.sql.Timestamp;
+
+import com.aiegoo.comicrental.util.DBConnectionUtil;
+
+// added service for transactional rental logic
+import com.aiegoo.comicrental.RentalService;
 
 public class App {
     private final ComicRepository comicRepo = new ComicRepository();
     private final MemberRepository memberRepo = new MemberRepository();
     private final RentalRepository rentalRepo = new RentalRepository();
+    private final RentalService rentalService = new RentalService();
 
     public void handle(String line, Scanner scanner) {
         Rq rq = new Rq(line);
@@ -14,14 +23,16 @@ public class App {
             switch (cmd) {
                 case "comic-add" -> cmdComicAdd(scanner);
                 case "comic-list" -> cmdComicList();
+                case "comic-search" -> cmdComicSearch(rq.getArg(0));
                 case "comic-detail" -> cmdComicDetail(rq.getArg(0));
                 case "comic-update" -> cmdComicUpdate(rq.getArg(0));
                 case "comic-delete" -> cmdComicDelete(rq.getArg(0));
                 case "member-add" -> cmdMemberAdd(scanner);
                 case "member-list" -> cmdMemberList();
+                case "member-rentals" -> cmdMemberRentals(rq.getArg(0));
                 case "rent" -> cmdRent(rq.getArg(0), rq.getArg(1));
                 case "return" -> cmdReturn(rq.getArg(0));
-                case "rental-list" -> cmdRentalList();
+                case "rental-list" -> cmdRentalList(rq.getArg(0));
                 case "" -> System.out.println();
                 default -> System.out.println("Unknown command: " + cmd);
             }
@@ -51,6 +62,21 @@ public class App {
 
     private void cmdComicList() throws Exception {
         List<Comic> list = comicRepo.listComics();
+        System.out.printf("번호 | 제목 | 권수 | 작가 | 상태 | 등록일\n");
+        for (Comic c : list) {
+            String status = c.isRented() ? "대여중" : "대여가능";
+            System.out.printf("%d | %s | %d | %s | %s | %s\n",
+                    c.getId(), c.getTitle(), c.getVolume(), c.getAuthor(), status,
+                    c.getRegDate() == null ? "" : c.getRegDate().toString());
+        }
+    }
+
+    private void cmdComicSearch(String keyword) throws Exception {
+        if (keyword == null || keyword.isEmpty()) {
+            System.out.println("Usage: comic-search [keyword]");
+            return;
+        }
+        List<Comic> list = comicRepo.searchComics(keyword);
         System.out.printf("번호 | 제목 | 권수 | 작가 | 상태 | 등록일\n");
         for (Comic c : list) {
             String status = c.isRented() ? "대여중" : "대여가능";
@@ -118,6 +144,11 @@ public class App {
         String name = scanner.nextLine().trim();
         System.out.print("전화번호: ");
         String phone = scanner.nextLine().trim();
+        // prevent duplicate phone numbers
+        if (memberRepo.findByPhone(phone) != null) {
+            System.out.println("전화번호가 이미 등록되어 있습니다.");
+            return;
+        }
         Member m = new Member();
         m.setName(name);
         m.setPhone(phone);
@@ -135,6 +166,23 @@ public class App {
         }
     }
 
+    private void cmdMemberRentals(String memberIdStr) throws Exception {
+        if (memberIdStr == null) {
+            System.out.println("Usage: member-rentals [memberId]");
+            return;
+        }
+        int mid = Integer.parseInt(memberIdStr);
+        List<Rental> list = rentalRepo.findByMember(mid);
+        System.out.printf("대여id | 만화id | 회원id | 대여일 | 만기일 | 반납일\n");
+        for (Rental r : list) {
+            String returned = r.getReturnedAt() == null ? "-" : r.getReturnedAt().toLocalDate().toString();
+            String due = r.getDueDate() == null ? "" : r.getDueDate().toLocalDate().toString();
+            System.out.printf("%d | %d | %d | %s | %s | %s\n",
+                    r.getId(), r.getComicId(), r.getMemberId(),
+                    r.getRentedAt() == null ? "" : r.getRentedAt().toLocalDate().toString(), due, returned);
+        }
+    }
+
     private void cmdRent(String comicIdStr, String memberIdStr) throws Exception {
         if (comicIdStr == null || memberIdStr == null) {
             System.out.println("Usage: rent [comicId] [memberId]");
@@ -142,33 +190,11 @@ public class App {
         }
         int comicId = Integer.parseInt(comicIdStr);
         int memberId = Integer.parseInt(memberIdStr);
-        Comic c = comicRepo.showComicDetail(comicId);
-        if (c == null) {
-            System.out.println("Comic not found.");
-            return;
-        }
-        if (c.isRented()) {
-            System.out.println("Comic is already rented.");
-            return;
-        }
-        // perform rental in transaction
-        try (Connection conn = DBConnectionUtil.getConnection()) {
-            conn.setAutoCommit(false);
-            try {
-                Rental r = new Rental();
-                r.setComicId(comicId);
-                r.setMemberId(memberId);
-                r.setStatus("RENTED");
-                r.setRentedAt(java.time.LocalDateTime.now());
-                rentalRepo.add(r);
-                c.setRented(true);
-                comicRepo.updateComic(c);
-                conn.commit();
-                System.out.println("대여 완료: [대여id=" + r.getId() + "] 만화("+comicId+") → 회원("+memberId+")");
-            } catch (Exception ex) {
-                conn.rollback();
-                throw ex;
-            }
+        try {
+            Rental r = rentalService.rentComic(memberId, comicId);
+            System.out.println("대여 완료: [대여id=" + r.getId() + "] 만화("+comicId+") → 회원("+memberId+")");
+        } catch (IllegalStateException ise) {
+            System.out.println(ise.getMessage());
         }
     }
 
@@ -178,41 +204,24 @@ public class App {
             return;
         }
         int rid = Integer.parseInt(rentalIdStr);
-        Rental r = rentalRepo.findById(rid);
-        if (r == null) {
-            System.out.println("Rental not found.");
-            return;
-        }
-        if ("RETURNED".equals(r.getStatus())) {
-            System.out.println("Already returned.");
-            return;
-        }
-        try (Connection conn = DBConnectionUtil.getConnection()) {
-            conn.setAutoCommit(false);
-            try {
-                r.setStatus("RETURNED");
-                r.setReturnedAt(java.time.LocalDateTime.now());
-                rentalRepo.update(r);
-                Comic c = comicRepo.showComicDetail(r.getComicId());
-                c.setRented(false);
-                comicRepo.updateComic(c);
-                conn.commit();
-                System.out.println("반납 완료: 대여id=" + rid);
-            } catch (Exception ex) {
-                conn.rollback();
-                throw ex;
-            }
-        }
+        rentalService.returnComic(rid);
+        System.out.println("반납 완료: 대여id=" + rid);
     }
 
-    private void cmdRentalList() throws Exception {
-        List<Rental> list = rentalRepo.listAll();
-        System.out.printf("대여id | 만화id | 회원id | 대여일 | 반납일\n");
+    private void cmdRentalList(String option) throws Exception {
+        List<Rental> list;
+        if ("open".equalsIgnoreCase(option)) {
+            list = rentalRepo.listOpen();
+        } else {
+            list = rentalRepo.listAll();
+        }
+        System.out.printf("대여id | 만화id | 회원id | 대여일 | 만기일 | 반납일\n");
         for (Rental r : list) {
             String returned = r.getReturnedAt() == null ? "-" : r.getReturnedAt().toLocalDate().toString();
-            System.out.printf("%d | %d | %d | %s | %s\n",
+            String due = r.getDueDate() == null ? "" : r.getDueDate().toLocalDate().toString();
+            System.out.printf("%d | %d | %d | %s | %s | %s\n",
                     r.getId(), r.getComicId(), r.getMemberId(),
-                    r.getRentedAt() == null ? "" : r.getRentedAt().toLocalDate().toString(), returned);
+                    r.getRentedAt() == null ? "" : r.getRentedAt().toLocalDate().toString(), due, returned);
         }
     }
 }

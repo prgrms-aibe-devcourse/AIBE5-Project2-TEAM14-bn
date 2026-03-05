@@ -11,7 +11,7 @@ public class MemberDAOImpl implements MemberDAO {
 
     @Override
     public void add(Member member) throws Exception {
-        String sql = "INSERT INTO members(name, phone_number) VALUES (?, ?)";
+        String sql = "INSERT INTO members(name, phone) VALUES (?, ?)";
         try (Connection conn = DBConnectionUtil.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
             stmt.setString(1, member.getName());
@@ -32,7 +32,7 @@ public class MemberDAOImpl implements MemberDAO {
 
     @Override
     public List<Member> listAll() throws Exception {
-        String sql = "SELECT id, name, phone_number FROM members ORDER BY id";
+        String sql = "SELECT id, name, phone, join_date FROM members ORDER BY id";
         List<Member> list = new ArrayList<>();
         try (Connection conn = DBConnectionUtil.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql);
@@ -41,10 +41,37 @@ public class MemberDAOImpl implements MemberDAO {
                 Member m = new Member();
                 m.setId(rs.getInt("id"));
                 m.setName(rs.getString("name"));
-                m.setPhone(rs.getString("phone_number"));
+                m.setPhone(rs.getString("phone"));
+                Date jd = rs.getDate("join_date");
+                if (jd != null) {
+                    m.setRegDate(jd.toLocalDate());
+                }
                 list.add(m);
             }
         }
         return list;
+    }
+
+    @Override
+    public Member findByPhone(String phone) throws Exception {
+        String sql = "SELECT id, name, phone, join_date FROM members WHERE phone = ?";
+        try (Connection conn = DBConnectionUtil.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setString(1, phone);
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    Member m = new Member();
+                    m.setId(rs.getInt("id"));
+                    m.setName(rs.getString("name"));
+                    m.setPhone(rs.getString("phone"));
+                    Date jd = rs.getDate("join_date");
+                    if (jd != null) {
+                        m.setRegDate(jd.toLocalDate());
+                    }
+                    return m;
+                }
+            }
+        }
+        return null;
     }
 }
