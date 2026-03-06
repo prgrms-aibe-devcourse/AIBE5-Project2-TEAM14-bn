@@ -14,10 +14,23 @@ public class DBConnectionUtil {
     private static final String USER = "root";
     private static final String PASSWORD = "ChangeMeRoot!";
     
+    // when run as part of the TUI we may wish to silence these messages
+    private static boolean verbose = true;
+
+    public static void setVerbose(boolean v) {
+        verbose = v;
+    }
+
+    public static boolean isVerbose() {
+        return verbose;
+    }
+
     static {
         try {
             Class.forName("com.mysql.cj.jdbc.Driver");
-            System.out.println("[DBConnectionUtil] JDBC driver loaded.");
+            if (verbose) {
+                System.out.println("[DBConnectionUtil] JDBC driver loaded.");
+            }
         } catch (ClassNotFoundException e) {
             System.err.println("[DBConnectionUtil] MySQL JDBC driver not found in classpath.");
         }
@@ -37,7 +50,9 @@ public class DBConnectionUtil {
     public static Connection getConnection() throws SQLException {
         try {
             Connection conn = DriverManager.getConnection(URL, USER, PASSWORD);
-            System.out.println("[DBConnectionUtil] Connection established successfully to comic_rental database.");
+            if (verbose) {
+                System.out.println("[DBConnectionUtil] Connection established successfully to comic_rental database.");
+            }
             return conn;
         } catch (SQLException e) {
             System.err.println("[DBConnectionUtil] Failed to establish connection: " + e.getMessage());
@@ -54,7 +69,9 @@ public class DBConnectionUtil {
         if (conn != null) {
             try {
                 conn.close();
-                System.out.println("[DBConnectionUtil] Connection closed successfully.");
+                if (verbose) {
+                    System.out.println("[DBConnectionUtil] Connection closed successfully.");
+                }
             } catch (SQLException e) {
                 System.err.println("[DBConnectionUtil] Error closing connection: " + e.getMessage());
             }
@@ -67,7 +84,9 @@ public class DBConnectionUtil {
      */
     public static void registerShutdownHook() {
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-            System.out.println("[DBConnectionUtil] Shutdown hook invoked - cleaning up resources.");
+            if (verbose) {
+                System.out.println("[DBConnectionUtil] Shutdown hook invoked - cleaning up resources.");
+            }
             // If using a connection pool, close it here
             // For simple DriverManager connections, individual connections should be closed in finally blocks
         }));

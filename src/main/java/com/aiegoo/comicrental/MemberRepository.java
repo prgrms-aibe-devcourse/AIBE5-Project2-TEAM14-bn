@@ -6,7 +6,15 @@ import com.aiegoo.comicrental.dao.MemberDAOImpl;
 import java.util.List;
 
 public class MemberRepository {
-    private final MemberDAO dao = new MemberDAOImpl();
+    private final MemberDAO dao;
+
+    public MemberRepository() {
+        try {
+            dao = new MemberDAOImpl();
+        } catch (Exception e) {
+            throw new RuntimeException("failed to initialize DAO", e);
+        }
+    }
 
     public Member addMember(Member member) throws Exception {
         dao.add(member);

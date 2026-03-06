@@ -14,10 +14,13 @@ public class Dashboard {
 
     public Dashboard(Scanner scanner) {
         this.scanner = scanner;
+        // simple dashboard triggers database calls frequently; avoid log spam
+        com.aiegoo.comicrental.util.DBConnectionUtil.setVerbose(false);
     }
 
     public void run() {
         while (true) {
+            clearScreen();
             printHeader();
             printMenu();
             System.out.print("Choose an option: ");
@@ -48,6 +51,15 @@ public class Dashboard {
         System.out.println("============================");
         System.out.println("  Comic Rental Dashboard");
         System.out.println("============================");
+    }
+
+    /**
+     * Clear the terminal using ANSI escape sequences. Works in most modern
+     * terminals (including tmux panes) and keeps the UI from scrolling endlessly.
+     */
+    private void clearScreen() {
+        System.out.print("\033[H\033[2J");
+        System.out.flush();
     }
 
     private void printMenu() {

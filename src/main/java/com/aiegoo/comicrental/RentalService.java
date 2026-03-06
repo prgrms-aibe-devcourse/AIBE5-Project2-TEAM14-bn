@@ -3,14 +3,51 @@ package com.aiegoo.comicrental;
 import com.aiegoo.comicrental.util.DBConnectionUtil;
 
 import java.sql.Connection;
+import java.sql.DatabaseMetaData;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.sql.Statement;
 
 public class RentalService {
 
+    private final String seriesTable;     // either "gcd_series" or "comics"
+    private final boolean hasIsRentedCol; // whether seriesTable contains is_rented column
+
+    public RentalService() {
+        String tbl = "comics";
+        boolean col = false;
+        try (Connection conn = DBConnectionUtil.getConnection()) {
+            DatabaseMetaData md = conn.getMetaData();
+            // check if gcd_series exists
+            try (ResultSet rs = md.getTables(null, null, "gcd_series", null)) {
+                if (rs.next()) {
+                    tbl = "gcd_series";
+                }
+            }
+            // check for is_rented column, and add it if missing for gcd_series
+            try (ResultSet rs = md.getColumns(null, null, tbl, "is_rented")) {
+                if (rs.next()) {
+                    col = true;
+                } else {
+                    // if using gcd_series create the column automatically
+                    if ("gcd_series".equals(tbl)) {
+                        try (Statement s = conn.createStatement()) {
+                            s.execute("ALTER TABLE gcd_series ADD COLUMN is_rented TINYINT(1) DEFAULT 0");
+                        }
+                        col = true;
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            // ignore; we'll let later operations fail if necessary
+        }
+        this.seriesTable = tbl;
+        this.hasIsRentedCol = col;
+    }
+
     /**
-     * Rent a comic from the gcd_series table.  Returns a Rental object representing
+     * Rent a comic from whichever series table is in use.  Returns a Rental object representing
      * the newly-created rental record.  Throws if the comic is already rented or
      * does not exist.
      */
@@ -19,15 +56,17 @@ public class RentalService {
             conn.setAutoCommit(false);
             try {
                 // verify comic exists and is not rented
-                String check = "SELECT is_rented FROM gcd_series WHERE id = ?";
-                try (PreparedStatement stmt = conn.prepareStatement(check)) {
-                    stmt.setInt(1, comicId);
-                    try (ResultSet rs = stmt.executeQuery()) {
-                        if (!rs.next()) {
-                            throw new IllegalArgumentException("Comic id " + comicId + " not found in gcd_series");
-                        }
-                        if (rs.getInt("is_rented") == 1) {
-                            throw new IllegalStateException("Comic " + comicId + " is already rented");
+                if (hasIsRentedCol) {
+                    String check = "SELECT is_rented FROM " + seriesTable + " WHERE id = ?";
+                    try (PreparedStatement stmt = conn.prepareStatement(check)) {
+                        stmt.setInt(1, comicId);
+                        try (ResultSet rs = stmt.executeQuery()) {
+                            if (!rs.next()) {
+                                throw new IllegalArgumentException("Comic id " + comicId + " not found in " + seriesTable);
+                            }
+                            if (rs.getInt("is_rented") == 1) {
+                                throw new IllegalStateException("Comic " + comicId + " is already rented");
+                            }
                         }
                     }
                 }
@@ -49,10 +88,12 @@ public class RentalService {
                 }
 
                 // mark the comic as rented
-                String update = "UPDATE gcd_series SET is_rented = 1 WHERE id = ?";
-                try (PreparedStatement stmt = conn.prepareStatement(update)) {
-                    stmt.setInt(1, comicId);
-                    stmt.executeUpdate();
+                if (hasIsRentedCol) {
+                    String update = "UPDATE " + seriesTable + " SET is_rented = 1 WHERE id = ?";
+                    try (PreparedStatement stmt = conn.prepareStatement(update)) {
+                        stmt.setInt(1, comicId);
+                        stmt.executeUpdate();
+                    }
                 }
 
                 conn.commit();
@@ -62,7 +103,6 @@ public class RentalService {
                 r.setMemberId(memberId);
                 r.setComicId(comicId);
                 r.setStatus("RENTED");
-                // assume due_date default is 7 days; mirror that in object
                 r.setDueDate(java.time.LocalDateTime.now().plusDays(7));
                 return r;
             } catch (Exception ex) {
@@ -111,11 +151,13 @@ public class RentalService {
                     stmt.executeUpdate();
                 }
 
-                // unmark the comic
-                String updateComic = "UPDATE gcd_series SET is_rented = 0 WHERE id = ?";
-                try (PreparedStatement stmt = conn.prepareStatement(updateComic)) {
-                    stmt.setInt(1, comicId);
-                    stmt.executeUpdate();
+                // unmark the comic if we have the flag column
+                if (hasIsRentedCol) {
+                    String updateComic = "UPDATE " + seriesTable + " SET is_rented = 0 WHERE id = ?";
+                    try (PreparedStatement stmt = conn.prepareStatement(updateComic)) {
+                        stmt.setInt(1, comicId);
+                        stmt.executeUpdate();
+                    }
                 }
 
                 conn.commit();

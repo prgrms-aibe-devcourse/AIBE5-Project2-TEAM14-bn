@@ -1,0 +1,16 @@
+# sample tmuxinator project for the comic rental TUI
+# copy this file to ~/.tmuxinator/comic.yml or use it as a starting point.
+
+name: comic
+root: ~/repos/aiegoo/devcourse/project2
+
+windows:
+  - shell:
+      layout: even-horizontal
+      panes:
+        - docker-compose exec mysql bash
+        - docker-compose logs -f mysql
+  - tui:
+      panes:
+        - # command to start the rich Java TUI once compiled (add TUI_JAR to classpath)
+          java -cp out:mysql-connector-java-8.0.xx.jar:lanterna-3.2.1.jar com.aiegoo.comicrental.tui.Tui

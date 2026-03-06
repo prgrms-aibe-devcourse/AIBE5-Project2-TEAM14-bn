@@ -9,9 +9,27 @@ import java.util.List;
 
 public class MemberDAOImpl implements MemberDAO {
 
+    private final String phoneCol; // column to use, either "phone" or "phone_number"
+
+    public MemberDAOImpl() throws Exception {
+        // determine which column name exists in the current schema
+        try (Connection conn = DBConnectionUtil.getConnection()) {
+            DatabaseMetaData md = conn.getMetaData();
+            boolean hasPhone = false;
+            try (ResultSet rs = md.getColumns(null, null, "members", "phone")) {
+                hasPhone = rs.next();
+            }
+            if (hasPhone) {
+                phoneCol = "phone";
+            } else {
+                phoneCol = "phone_number"; // assume exists, otherwise queries will fail later
+            }
+        }
+    }
+
     @Override
     public void add(Member member) throws Exception {
-        String sql = "INSERT INTO members(name, phone) VALUES (?, ?)";
+        String sql = "INSERT INTO members(name, " + phoneCol + ") VALUES (?, ?)";
         try (Connection conn = DBConnectionUtil.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
             stmt.setString(1, member.getName());
@@ -32,7 +50,7 @@ public class MemberDAOImpl implements MemberDAO {
 
     @Override
     public List<Member> listAll() throws Exception {
-        String sql = "SELECT id, name, phone, join_date FROM members ORDER BY id";
+        String sql = "SELECT id, name, " + phoneCol + " AS phone, join_date FROM members ORDER BY id";
         List<Member> list = new ArrayList<>();
         try (Connection conn = DBConnectionUtil.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql);
@@ -54,7 +72,7 @@ public class MemberDAOImpl implements MemberDAO {
 
     @Override
     public Member findByPhone(String phone) throws Exception {
-        String sql = "SELECT id, name, phone, join_date FROM members WHERE phone = ?";
+        String sql = "SELECT id, name, " + phoneCol + " AS phone, join_date FROM members WHERE " + phoneCol + " = ?";
         try (Connection conn = DBConnectionUtil.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
             stmt.setString(1, phone);

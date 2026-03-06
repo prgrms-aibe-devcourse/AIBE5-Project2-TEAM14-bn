@@ -28,6 +28,12 @@ feature branches for the core system and future SimpleDB threading features.
 3. Download the MySQL JDBC driver (``mysql-connector-java-8.0.xx.jar``) from
    https://dev.mysql.com/downloads/connector/j/ and place the jar in the project
    root (or any folder you like).
+
+> **MySQL client vs application CLI:** you will see a prompt like `mysql>` when
+> you connect to the database itself.  That is **not** where you type
+> `comic-list`, `rent`, etc.; those commands are understood only by the Java
+> application which prints a `>` prompt when running.  Typing application
+> commands at the MySQL prompt will simply hang until you cancel (`Ctrl-C`).
 4. Compile the source files:
    ```sh
    javac -d out \
@@ -39,8 +45,22 @@ feature branches for the core system and future SimpleDB threading features.
    ```sh
    java -cp out:mysql-connector-java-8.0.xx.jar \
        com.aiegoo.comicrental.Main
+   # or, if you downloaded the full connector distribution and are
+   # using the bundled jar under the `mysql-connector-j-*` folder:
+   # java -cp out:mysql-connector-j-9.6.0/mysql-connector-j-9.6.0.jar \
+   #     com.aiegoo.comicrental.Main
    ```
    (adjust the jar file name/path if you saved it elsewhere.)
+
+   **TUI mode:** the same command accepts an optional `dashboard` argument
+   that launches a simple text‑based dashboard. You can also use the helper
+   make target from the project root:
+   ```sh
+   make dashboard
+   ```
+
+   > In tmux you may want to run the CLI in one pane and follow the database
+   > logs in another; the section below shows a suggested layout.
 6. At the `>` prompt type commands like `comic-add`, `comic-list`,
    `member-add`, `rent 1 1`, `rental-list`, etc. Use `exit` to quit.
 
@@ -101,6 +121,18 @@ data in the workspace or edit `init.sql` for your own samples.
    ```
 3. Browse phpMyAdmin (`http://localhost:8080`) or Adminer (`http://localhost:8081`).
 
+   **Verifying inserted data:**
+   When you add members/comics via the Java CLI or dashboard you can
+   inspect the same database from within the container.  For example:
+   ```sh
+   docker-compose exec mysql mysql -uroot -p"$MYSQL_ROOT_PASSWORD" comic_rental \
+       -e "SELECT id,name,phone_number FROM members;"
+   docker-compose exec mysql mysql -uroot -p"$MYSQL_ROOT_PASSWORD" comic_rental \
+       -e "SELECT id,title,volume_count,author,is_rented FROM comics;"
+   ```
+   (the phone column may be called `phone` or `phone_number` depending on
+   which schema you’re using; the application handles both.)
+
 If you prefer a shell inside the container you can drop into bash and invoke the
 `mysql` client directly.  A `make exec` rule has been added to the Makefile for
 this purpose:
@@ -113,7 +145,42 @@ mysql -uroot -p"$MYSQL_ROOT_PASSWORD" comic_rental
 
 # or simply inspect the raw dump file if needed
 ls -lh /docker-entrypoint-initdb.d
+
+# (optional) Use tmux for live logs and dual-pane interaction
+If you're building a TUI and want to view the MySQL log output alongside a shell, start a tmux session with two panes:
+```sh
+# split horizontally, left pane for bash, right pane for logs
+tmux new-session -s comicview \;
+  send-keys 'docker-compose exec mysql bash' C-m \;
+  split-window -h \;
+  send-keys 'docker-compose logs -f mysql' C-m
 ```
+You can then navigate panes with `Ctrl-b` + arrow keys.  This setup lets you type commands in the container while watching log messages update in real time, which is helpful during TUI development.```
+
+### tmuxinator (optional)
+
+If you'd like to launch the dashboard and log pane together with a single command, consider using tmuxinator. A starter project file is included in the repository at
+`tmux/comic.yml`; you can copy it to `~/.tmuxinator/comic.yml` and tweak paths or
+classpaths as needed. The contents look like:
+
+```yaml
+name: comic
+root: ~/repos/aiegoo/devcourse/project2
+
+windows:
+  - shell:
+      layout: even-horizontal
+      panes:
+        - docker-compose exec mysql bash
+        - docker-compose logs -f mysql
+  - tui:
+      panes:
+        - # command to start the Java TUI once compiled
+          java -cp out:mysql-connector-java-8.0.xx.jar com.aiegoo.comicrental.Main
+```
+
+Run `tmuxinator start comic` to spawn panes and execute the commands automatically.
+
 ### Example test queries
 ```sql
 SELECT * FROM comics;               -- legacy demo table
@@ -473,6 +540,75 @@ During setup the following issues were encountered and corrected:
 * Documentation updated to show how to download and supply the platform‑independent JDBC jar.
 
 These changes are all committed on the `ssot` branch; the application now runs correctly after importing the schema.
+
+---
+
+## 🚧 Upcoming Text‑based User Interface (TUI)
+
+Work on a richer TUI will take place on the `tui` branch and will eventually
+replace the simple menu dashboard described earlier.
+
+### Goals
+
+* Provide full‑screen, menu‑driven screens with keyboard (arrow/enter) navigation.
+* Use a Java console library such as Lanterna or JLine to manage windows, layouts
+  and input.
+* Offer the same operations currently available via CLI commands, with forms
+  and paginated result lists.
+* Preserve the existing command‑line interface for scripting/testing – CLI and
+  the older dashboard will continue to work side‑by‑side.
+
+### Local setup
+
+1. **Install tmux & tmuxinator** (macOS/brew example):
+   ```sh
+   brew install tmux        # or your platform's package manager
+   gem install tmuxinator   # requires Ruby gem system
+   ```
+2. **Obtain a TUI library**.  Download the Lanterna jar (e.g.
+   `lanterna-3.2.1.jar`) from https://github.com/mabe02/lanterna/releases or
+   add the dependency in your Maven/Gradle build.  Set the path via the
+   `TUI_JAR` environment variable when running `make tui`.
+3. **Build the project** using the provided Makefile; it now compiles the TUI
+   package as well:
+   ```sh
+   make build JDBC_JAR=mysql-connector-java-8.0.xx.jar TUI_JAR=lanterna-3.2.1.jar
+   ```
+4. **Run modes** – choose one of the following:
+   * `make run`   → the original CLI (verbose DB messages enabled)
+   * `make dashboard` → the simple text‑menu dashboard (DB logs are
+     suppressed to avoid scrolling the menu)
+   * `make tui TUI_JAR=lanterna-3.2.1.jar` → the rich Lanterna‑based GUI
+     (connection logging disabled and both stdout/stderr captured so command
+     output and exceptions are shown in dialogs rather than corrupting the
+     screen)
+5. **tmux support** – the sample tmuxinator project (`tmux/comic.yml`) now
+   launches the `Tui` class in its second window.  Copy the file to
+   `~/.tmuxinator/comic.yml` and run:
+   ```sh
+   tmuxinator start comic
+   ```
+   Pane 1 will be a shell (for docker commands, SQL client, etc.) and pane 2 will
+   start the Java TUI (once you’ve compiled with `TUI_JAR` on the classpath).
+
+### Branch workflow
+
+1. Create and switch to branch: `git checkout -b tui` (done).
+2. Implement screen layouts and input handling (see `src/main/java/com/aiegoo/comicrental/tui/Tui.java`).
+3. Keep documentation in README up to date, including sample screenshots.
+4. Merge back to `master` when the TUI reaches feature parity.
+
+### Schema compatibility
+
+The application can run against either the simple `comics`/`members` schema
+used by `schema.sql` or the more elaborate dataset produced by
+`init.sql` (which includes a `gcd_series` table and a `phone` column on
+`members`). On startup the DAOs detect which column names are available and
+`RentalService` detects whether `gcd_series` exists, automatically adding an
+`is_rented` column if necessary.  This means you can migrate an existing
+database by simply running the application once; it will alter tables as
+needed.  However, for new setups using Docker Compose it’s easiest to rely on
+`init.sql` as described above.
 
 
 
