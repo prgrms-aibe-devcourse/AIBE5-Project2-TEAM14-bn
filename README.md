@@ -1,7 +1,7 @@
 # AIBE5-Project2-TEAM12-bn
 
 ## mini project (comic books rental service cli app)
-```
+```bash
 a2485@maegbug-ui-MacBookPro cli-comics % export JAVA_HOME=/Library/Java/JavaVirt
 ualMachines/temurin-21.jdk/Contents/Home && MYSQL_JAR=$(find ~/.gradle/caches -n
 ame 'mysql-connector-j-8.0.33.jar' 2>/dev/null | head -1) && $JAVA_HOME/bin/java
