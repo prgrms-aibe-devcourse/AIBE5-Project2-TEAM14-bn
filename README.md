@@ -35,6 +35,43 @@ Deployment architecture for local development (all in same submodule):
 - Data persistence : `mysql` container + `comic_db_data` volume.
 - Optional dashboard / logs integration using `tmux` (only for developer convenience).
 
+The comic rental CLI is intentionally lightweight. The following sketch illustrates how the major layers interact:
+
+```
+   +----------------+        +----------------+
+   | Console & Main |        |     Docker     |
+   |  (App + Rq)    |        |  MySQL + phpMy |
+   +--------+-------+        +--------+-------+
+        |                         ^
+        |                         |
+        v                         |
+   +----------------+                 |
+   | Command Router |                 |
+   |   (App.java)   |                 |
+   +--------+-------+                 |
+        |                         |
+        v                         |
+  +-----------+-----------+            |
+  | DAO / Repository Layer |------------+
+  | (Comic/Member/Rental)  |
+  +-----------+-----------+
+        |
+        v
+   +----------------+
+   |  MySQL Schema  |
+   | comics/members |
+   | rentals/views  |
+   +----------------+
+```
+
+1. `Main` and `App` read user input via `Scanner`, pass tokens to `Rq`, and dispatch to router logic.
+2. Each CRUD command delegates to a repository (`ComicRepository`, `MemberRepository`, `RentalRepository`) that hides JDBC details.
+3. Repositories issue `PreparedStatement` SQL against the `comic_rental` schema defined in `schema.sql`/`init.sql`.
+4. Docker Compose spins up the MySQL service so the CLI can connect at `jdbc:mysql://localhost:3306/comic_rental` with credentials from `.env`.
+
+This layered design keeps the CLI focused on user interaction while centralizing persistence code in the DAO layer and isolating the database via Docker during development.
+
+
 ## Branching Strategy
 See [BRANCHING_STRATEGY.md](BRANCHING_STRATEGY.md) for guidelines on creating
 feature branches for the core system and future SimpleDB threading features.
