@@ -157,29 +157,6 @@ tmux new-session -s comicview \;
 ```
 You can then navigate panes with `Ctrl-b` + arrow keys.  This setup lets you type commands in the container while watching log messages update in real time, which is helpful during TUI development.```
 
-### tmuxinator (optional)
-
-If you'd like to launch the dashboard and log pane together with a single command, consider using tmuxinator. A starter project file is included in the repository at
-`tmux/comic.yml`; you can copy it to `~/.tmuxinator/comic.yml` and tweak paths or
-classpaths as needed. The contents look like:
-
-```yaml
-name: comic
-root: ~/repos/aiegoo/devcourse/project2
-
-windows:
-  - shell:
-      layout: even-horizontal
-      panes:
-        - docker-compose exec mysql bash
-        - docker-compose logs -f mysql
-  - tui:
-      panes:
-        - # command to start the Java TUI once compiled
-          java -cp out:mysql-connector-java-8.0.xx.jar com.aiegoo.comicrental.Main
-```
-
-Run `tmuxinator start comic` to spawn panes and execute the commands automatically.
 
 ### Example test queries
 ```sql
