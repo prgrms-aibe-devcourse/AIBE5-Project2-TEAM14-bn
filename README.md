@@ -11,6 +11,30 @@ comic books, members, and rentals.
   - `dao` – interfaces defining data-access operations.
   - `Main.java` – entry point with a command loop.
 
+## System Architecture
+
+The system is designed as a layered Java CLI application with clear separation of concerns:
+
+- **CLI / TUI Layer** (`Main.java`, `tui` mode)
+  - Reads console commands and delegates to service layer.
+  - Supports commands such as `comic-add`, `member-add`, `rent`, `return`, `rental-list`.
+- **Service Layer** (`RentalService`, `MemberService`, etc.)
+  - Contains business rules (e.g., block renting when a comic is already rented).
+  - Handles validation and transaction flow.
+- **DAO Layer** (`dao/*Dao.java`, `dao/*DaoImpl.java`)
+  - Implements JDBC interactions using `PreparedStatement` and resource management.
+  - CRUD operations on `comics`, `members`, `rentals`.
+- **Database Layer** (MySQL)
+  - Schema managed via `schema.sql`, and Docker initialization in `init.sql`.
+  - Runs in `docker-compose` as service `mysql` with optional phpMyAdmin/adminer.
+
+Deployment architecture for local development (all in same submodule):
+
+- `comic-rental-tui` repository root contains the app code and Docker orchestration.
+- `aibe5-comic` submodule is the reusable project component with code and docs.
+- Data persistence : `mysql` container + `comic_db_data` volume.
+- Optional dashboard / logs integration using `tmux` (only for developer convenience).
+
 ## Branching Strategy
 See [BRANCHING_STRATEGY.md](BRANCHING_STRATEGY.md) for guidelines on creating
 feature branches for the core system and future SimpleDB threading features.
